@@ -1,18 +1,19 @@
-# 1. 忽略根目录下的所有文件和文件夹
-/*
+# --- 1. 忽略你指定的实验文件夹 ---
+mshab_exps/
 
-# 2. 不要忽略 .gitignore 文件本身（非常重要，否则你下次无法修改规则）
-!.gitignore
+mshab_exps_predict/
 
-# 3. --- 白名单区域 (只允许以下文件夹) ---
+mshab.egg-info/
 
-# 允许 GAPartMobile 文件夹
-!/GAPartMobile/
+# --- 2. 安全忽略 (强烈建议！) ---
+# 截图里看到的私钥文件，千万不要上传！
+id_rsa_llmnav
+# 截图里的 wandb 文件夹通常包含日志和缓存，建议忽略
+wandb/
+# 截图里的 .venv (虚拟环境) 包含大量库文件，不应上传
+.venv/
 
-# 允许 mshab 子文件夹
-!/mshab/
-
-# 注意：如果这两个文件夹内部还有你想忽略的文件（比如 __pycache__），
-# 你可能还需要额外添加规则，例如：
-# __pycache__/
-# *.pyc
+# --- 3. 标准 Python 忽略规则 (防乱码) ---
+__pycache__/
+*.pyc
+.DS_Store
