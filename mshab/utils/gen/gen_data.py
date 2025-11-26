@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import asdict
 from functools import partial
 from pathlib import Path
-
+import ipdb
 from tqdm import tqdm
 
 from gymnasium import spaces
@@ -29,7 +29,7 @@ from mshab.utils.logger import Logger, LoggerConfig
 from mshab.utils.time import NonOverlappingTimeProfiler
 
 
-NUM_ENVS = 252
+NUM_ENVS = 189
 SEED = 2024
 MAX_TRAJECTORIES = 1000
 
@@ -102,7 +102,7 @@ def eval(
         info_on_video=False,
         debug_video=DEBUG_VIDEO_GEN,
         debug_video_gen=DEBUG_VIDEO_GEN,
-        continuous_task=True,
+        continuous_task=False,
         cat_state=True,
         cat_pixels=False,
         task_plan_fp=(
@@ -182,7 +182,7 @@ def eval(
         wrappers=wrappers,
     )
     eval_obs, _ = eval_envs.reset()
-
+   
     # -------------------------------------------------------------------------------------------------
     # SPACES
     # -------------------------------------------------------------------------------------------------
@@ -346,39 +346,47 @@ def eval(
                 for raw_pose in obj_poses_wrt_tcp.raw_pose[info["success"]].cpu():
                     success_obj_raw_poses_wrt_tcp.append(raw_pose)
 
-        update_pbar()
-        if torch.any(done) and len(env_cfg.extra_stat_keys) > 0:
-            torch.save(
-                eval_envs.extra_stats,
-                logger.exp_path / "eval_extra_stat_keys.pt",
-            )
-            for env_num, extra_stats_idx in zip(
-                torch.where(done)[0],
-                -torch.arange(1, torch.sum(done.int() + 1)),
-            ):
-                episode_extra_stats = recursive_slice(
-                    eval_envs.extra_stats, extra_stats_idx
+        if torch.any(info["success"]):
+            update_pbar()
+            if len(env_cfg.extra_stat_keys) > 0:
+                torch.save(
+                    eval_envs.extra_stats,
+                    logger.exp_path / "eval_extra_stat_keys.pt",
                 )
-                label, _, _ = get_episode_label_and_events(
-                    eval_envs.unwrapped.task_cfgs,
-                    episode_extra_stats["success"],
-                    episode_extra_stats,
-                )
-                if label not in articulation_types_by_label:
-                    articulation_types_by_label[label] = defaultdict(int)
-                base_subtask = eval_envs.unwrapped.base_task_plans[
-                    (eval_envs.unwrapped.task_plan[0].composite_subtask_uids[env_num],)
-                ].subtasks[0]
-                if getattr(base_subtask, "articulation_config", None) is None:
-                    articulation_type = None
-                else:
-                    articulation_type = (
-                        base_subtask.articulation_config.articulation_type
-                    )
-                articulation_types_by_label[label][articulation_type] += 1
-                rcumulative_forces_by_label[label].append(
-                    torch.max(episode_extra_stats["robot_cumulative_force"]).item()
-                )
+                if torch.any(done):
+                    for env_num, extra_stats_idx in zip(
+                        torch.where(done)[0],
+                        -torch.arange(1, torch.sum(done.int() + 1)),
+                    ):
+                        episode_extra_stats = recursive_slice(
+                            eval_envs.extra_stats, extra_stats_idx
+                        )
+                        label, _, _ = get_episode_label_and_events(
+                            eval_envs.unwrapped.task_cfgs,
+                            episode_extra_stats["success"],
+                            episode_extra_stats,
+                        )
+                        if label not in articulation_types_by_label:
+                            articulation_types_by_label[label] = defaultdict(int)
+                        base_subtask = eval_envs.unwrapped.base_task_plans[
+                            (
+                                eval_envs.unwrapped.task_plan[0].composite_subtask_uids[
+                                    env_num
+                                ],
+                            )
+                        ].subtasks[0]
+                        if getattr(base_subtask, "articulation_config", None) is None:
+                            articulation_type = None
+                        else:
+                            articulation_type = (
+                                base_subtask.articulation_config.articulation_type
+                            )
+                        articulation_types_by_label[label][articulation_type] += 1
+                        rcumulative_forces_by_label[label].append(
+                            torch.max(
+                                episode_extra_stats["robot_cumulative_force"]
+                            ).item()
+                        )
 
     step_num = 0
 
@@ -461,8 +469,18 @@ def eval(
     eval_envs.close()
     logger.close()
 
-
 if __name__ == "__main__":
     import sys
+    import argparse
+    parser = argparse.ArgumentParser(description="通过命令行参数运行评估任务。")
 
-    eval(task=sys.argv[1], subtask=sys.argv[2], obj_name=sys.argv[3])
+    # 2. 添加需要的参数
+    # --task 是参数名，help 是帮助信息，required=True 表示这是个必填参数
+    parser.add_argument('--task', type=str, required=True, help='要执行的主要任务名称 (例如: set_table)')
+    parser.add_argument('--subtask', type=str, required=True, help='要执行的子任务名称 (例如: pick)')
+    parser.add_argument('--obj_name', type=str, required=True, help='操作的物体名称 (例如: 024_bowl)')
+
+    # 3. 解析命令行传入的参数
+    args = parser.parse_args()
+    # 4. 使用解析到的参数调用函数
+    eval(task=args.task, subtask=args.subtask, obj_name=args.obj_name)

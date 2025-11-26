@@ -1,6 +1,13 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+import sys
+from pathlib import Path
+current_file_path = Path(__file__).resolve()
+project_root = current_file_path.parents[2]
+sys.path.append(str(project_root))
+
+import ipdb
 
 import gymnasium as gym
 
@@ -48,7 +55,7 @@ class EnvConfig:
 
     make_env: bool = True
     # NOTE (arth): env supports rgbd, pointcloud, segmentation, etc per ManiSkill; we use depth for provided baselines
-    obs_mode: str = "depth"
+    obs_mode: str = "rgbd"
     render_mode: str = "all"
     shader_dir: str = "minimal"
     sim_backend: str = "gpu"
@@ -97,6 +104,7 @@ def make_env(
         )
     if env_cfg.spawn_data_fp is not None:
         env_cfg.env_kwargs["spawn_data_fp"] = env_cfg.spawn_data_fp
+
     env = gym.make(
         env_cfg.env_id,
         max_episode_steps=env_cfg.max_episode_steps,
@@ -108,27 +116,30 @@ def make_env(
         robot_uids="fetch",
         num_envs=env_cfg.num_envs,
         sim_backend=env_cfg.sim_backend,
+        require_build_configs_repeated_equally_across_envs=False,
         **env_cfg.env_kwargs,
     )
 
     for wrapper in wrappers:
         env = wrapper(env)
+    from GAPartMobile.env.observation import OnlineValidationWrapper
+    env = OnlineValidationWrapper(env)
 
-    env = FetchDepthObservationWrapper(
-        env, cat_state=env_cfg.cat_state, cat_pixels=env_cfg.cat_pixels
-    )
-    if env_cfg.frame_stack is not None:
-        env = FrameStack(
-            env,
-            num_stack=env_cfg.frame_stack,
-            stacking_keys=(
-                ["all_depth"]
-                if env_cfg.cat_pixels
-                else ["fetch_head_depth", "fetch_hand_depth"]
-            ),
-        )
-    elif env_cfg.stack is not None:
-        env = StackedDictObservationWrapper(env, num_stack=env_cfg.stack)
+    # env = FetchDepthObservationWrapper(
+    #     env, cat_state=env_cfg.cat_state, cat_pixels=env_cfg.cat_pixels
+    # )
+    # if env_cfg.frame_stack is not None:
+    #     env = FrameStack(
+    #         env,
+    #         num_stack=env_cfg.frame_stack,
+    #         stacking_keys=(
+    #             ["all_depth"]
+    #             if env_cfg.cat_pixels
+    #             else ["fetch_head_depth", "fetch_hand_depth"]
+    #         ),
+    #     )
+    # elif env_cfg.stack is not None:
+    #     env = StackedDictObservationWrapper(env, num_stack=env_cfg.stack)
 
     if env_cfg.record_video:
         if env_cfg.debug_video:

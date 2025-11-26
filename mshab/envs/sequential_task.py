@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.random
 import transforms3d
+import ipdb
 
 import sapien
 
@@ -308,6 +309,7 @@ class SequentialTaskEnv(SceneManipulationEnv):
         subtask0 = parallel_subtasks[0]
 
         # NOTE (arth): current MS3 requires all parallel articulations be the same
+        # ipdb.set_trace()
         assert all_equal([subtask.articulation_type for subtask in parallel_subtasks])
         assert all_equal(
             [subtask.articulation_handle_link_idx for subtask in parallel_subtasks]
@@ -409,7 +411,7 @@ class SequentialTaskEnv(SceneManipulationEnv):
         env_idx: torch.Tensor,
         sampled_subtask_lists: List[List[Subtask]],
     ):
-
+        # ipdb.set_trace()
         self.subtask_objs: List[Actor] = []
         self.subtask_goals: List[Actor] = []
         self.subtask_articulations: List[Articulation] = []
@@ -1464,8 +1466,8 @@ class SequentialTaskEnv(SceneManipulationEnv):
     #       - subtasks that don't need that obs will set some default value
     #       - subtasks which need that obs will set value depending on subtask params
     def _get_obs_extra(self, info: Dict):
-        base_pose_inv = self.agent.base_link.pose.inv()
-
+        base_pose_world = self.agent.base_link.pose
+        base_pose_inv = base_pose_world.inv()
         # all subtasks will have same computation for
         #       - tcp_pose_wrt_base :   tcp always there and is same link
         tcp_pose_wrt_base = vectorize_pose(base_pose_inv * self.agent.tcp.pose)
@@ -1519,6 +1521,7 @@ class SequentialTaskEnv(SceneManipulationEnv):
             obj_pose_wrt_base=obj_pose_wrt_base,
             goal_pos_wrt_base=goal_pos_wrt_base,
             is_grasped=is_grasped,
+            base_pos_wrt_world=vectorize_pose(base_pose_world),
         )
 
     # -------------------------------------------------------------------------------------------------

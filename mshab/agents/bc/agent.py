@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.distributions.normal import Normal
-
+import ipdb
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     torch.nn.init.orthogonal_(layer.weight, std)
@@ -105,6 +105,7 @@ class Agent(nn.Module):
         pixels: Dict[str, torch.Tensor] = observations["pixels"]
         state: torch.Tensor = observations["state"]
         encoded_tensor_list = []
+
         for key, extractor in self.extractors.items():
             if key == "state":
                 encoded_tensor_list.append(extractor(state))

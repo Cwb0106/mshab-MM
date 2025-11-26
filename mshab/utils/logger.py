@@ -134,11 +134,12 @@ class Logger:
                     name=exp_name,
                     id=exp_cfg["wandb_id"],
                     resume="must",
+                    settings=wb.Settings(init_timeout=300),
                     **wandb_cfg,
                 )
                 self.last_log_step = max(self.last_log_step, self.wb_run.step)
             else:
-                self.wb_run = wb.init(project=project_name, name=exp_name, **wandb_cfg)
+                self.wb_run = wb.init(project=project_name, name=exp_name, settings=wb.Settings(init_timeout=300), **wandb_cfg)
                 exp_cfg["wandb_id"] = self.wb_run.id
 
     def _init_tb(self):

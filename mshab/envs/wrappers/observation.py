@@ -5,7 +5,7 @@ import gymnasium as gym
 
 import numpy as np
 import torch
-
+import ipdb
 from mani_skill.envs.sapien_env import BaseEnv
 from mani_skill.utils import common
 from mani_skill.utils.common import flatten_state_dict
@@ -26,8 +26,17 @@ class FetchDepthObservationWrapper(gym.ObservationWrapper):
         self._base_env.update_obs_space(common.to_numpy(self.observation(init_raw_obs)))
 
     def observation(self, observation):
+        del observation['extra']['base_pos_wrt_world']
         agent_obs = observation["agent"]
         extra_obs = observation["extra"]
+
+        # fetch_head_rgb = observation["sensor_data"]["fetch_head"]["rgb"].permute(
+        #     0, 3, 1, 2
+        # )
+        # fetch_hand_rgb = observation["sensor_data"]["fetch_hand"]["rgb"].permute(
+        #     0, 3, 1, 2
+        # )
+     
         fetch_head_depth = observation["sensor_data"]["fetch_head"]["depth"].permute(
             0, 3, 1, 2
         )
@@ -41,6 +50,8 @@ class FetchDepthObservationWrapper(gym.ObservationWrapper):
             )
             if self.cat_pixels
             else dict(
+                # fetch_head_rgb=fetch_head_rgb,
+                # fetch_hand_rgb=fetch_hand_rgb,
                 fetch_head_depth=fetch_head_depth,
                 fetch_hand_depth=fetch_hand_depth,
             )

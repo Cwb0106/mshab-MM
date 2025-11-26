@@ -15,6 +15,7 @@ from mani_skill import get_commit_info
 from mani_skill.utils import common, gym_utils
 from mani_skill.utils.io_utils import dump_json
 from mani_skill.utils.structs.types import Array
+from mani_skill.utils.structs.pose import vectorize_pose
 from mani_skill.utils.visualization.misc import images_to_video, tile_images
 
 from mshab.envs import (
@@ -131,7 +132,7 @@ class Step:
 
     success: np.ndarray = None
     fail: np.ndarray = None
-
+    base_pos_wrt_world: np.ndarray = None
 
 class RecordEpisode(gym.Wrapper):
 
@@ -344,6 +345,7 @@ class RecordEpisode(gym.Wrapper):
             action = common.batch(self.single_action_space.sample())
             first_step_info = info.copy()
             first_step_info.pop("reconfigure")
+            base_pos_wrt_world = vectorize_pose(self.base_env.agent.base_link.pose)
             first_step = Step(
                 state=common.to_numpy(common.batch(state_dict)),
                 observation=common.to_numpy(common.batch(obs)),
@@ -365,6 +367,7 @@ class RecordEpisode(gym.Wrapper):
                 success=np.zeros((1, self.num_envs), dtype=bool),
                 fail=np.zeros((1, self.num_envs), dtype=bool),
                 env_episode_ptr=np.zeros((self.num_envs,), dtype=int),
+                base_pos_wrt_world=common.to_numpy(common.batch(base_pos_wrt_world)),
             )
             env_idx = np.arange(self.num_envs)
             if "env_idx" in options:
@@ -405,6 +408,11 @@ class RecordEpisode(gym.Wrapper):
                     )
                 if self._trajectory_buffer.fail is not None:
                     recursive_replace(self._trajectory_buffer.fail, first_step.fail)
+                if self._trajectory_buffer.base_pos_wrt_world is not None:
+                    recursive_replace(
+                        self._trajectory_buffer.base_pos_wrt_world,
+                        first_step.base_pos_wrt_world,
+                    )
         if "env_idx" in options:
             options["env_idx"] = common.to_numpy(options["env_idx"])
         self.last_reset_kwargs = copy.deepcopy(dict(options=options, **kwargs))
@@ -472,6 +480,11 @@ class RecordEpisode(gym.Wrapper):
                 )
             else:
                 self._trajectory_buffer.fail = None
+            base_pos_wrt_world = vectorize_pose(self.base_env.agent.base_link.pose)
+            self._trajectory_buffer.base_pos_wrt_world = common.append_dict_array(
+                self._trajectory_buffer.base_pos_wrt_world,
+                common.to_numpy(common.batch(base_pos_wrt_world)),
+            )
             self._last_info = common.to_numpy(info)
 
         if self.save_video:
@@ -575,6 +588,7 @@ class RecordEpisode(gym.Wrapper):
                     spawn_selection_idx=self.base_env.spawn_selection_idxs[env_idx],
                     control_mode=self.base_env.control_mode,
                     elapsed_steps=end_ptr - start_ptr - 1,
+                    build_config_idxs=self.base_env.build_config_idxs[env_idx],
                     **episode_info,
                 )
                 if self.label_episode:
@@ -731,6 +745,14 @@ class RecordEpisode(gym.Wrapper):
                         dtype=np.float32,
                     )
 
+                if self._trajectory_buffer.base_pos_wrt_world is not None:
+                    group.create_dataset(
+                        "base_pos_wrt_world",
+                        data=self._trajectory_buffer.base_pos_wrt_world[start_ptr:end_ptr, env_idx],
+                        dtype=np.float32,
+                    )
+
+
                 self._json_data["episodes"].append(episode_info)
                 dump_json(
                     self._json_path,
@@ -789,6 +811,11 @@ class RecordEpisode(gym.Wrapper):
                 self._trajectory_buffer.fail = common.index_dict_array(
                     self._trajectory_buffer.fail, slice(min_env_ptr, N)
                 )
+            if self._trajectory_buffer.base_pos_wrt_world is not None:
+                self._trajectory_buffer.base_pos_wrt_world = common.index_dict_array(
+                    self._trajectory_buffer.base_pos_wrt_world, slice(min_env_ptr, N)
+                )
+
             self._trajectory_buffer.env_episode_ptr -= min_env_ptr
 
     def flush_video(
